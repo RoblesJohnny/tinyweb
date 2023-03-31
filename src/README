@@ -1,0 +1,11 @@
+# Tinyweb - A HTTP Server for Educational Purposes
+
+
+Software to install in a multipass instance with cloud init
+
+VALGRIND
+MAKE
+SSH
+
+add user johnny
+sudo add user johnny sudo

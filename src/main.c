@@ -1,17 +1,9 @@
+#include "http.h"
 #include <stdio.h>
 #include <stdlib.h>
 
-int add();
-
 int main()
 {
-    puts("Hello World");
-    add();
-    return EXIT_SUCCESS;
-}
-
-int add()
-{
-    printf("%s\n", "Texto de prueba");
-    return 0;
+    http_server server = http_server_init(8080, 100);
+    server.listen_and_serve(&server);
 }
