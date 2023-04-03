@@ -1,14 +1,34 @@
 #include "http.h"
 
-int http_listen_and_serve(http_server *server)
+int http_listen_and_serve(const http_server *server)
 {
-    // Listening
+    
+    // Listen
     if (listen(server->socket, server->backlog) < 0)
     {
         perror("http_listen_and_serve: Error listening on socket");
         exit(EXIT_FAILURE);
     };
 
+    //Creates a client
+    http_client client;
+
+    //Accept connections and requests
+    for (;;)
+    {
+        client.socket = accept(server->socket, (struct sockaddr *)&client.address, (socklen_t *)sizeof(struct sockaddr_in));
+        if (client.socket < 0)
+        {
+            perror("Accept failed");
+        }
+        puts("Connection Accepted");
+
+        // if (pthread_create(&thread, NULL, connection_handler, (void *)&client) < 0)
+        // {
+        //     perror("Could not create thread");
+        //     return EXIT_FAILURE;
+        // }
+    }
     return EXIT_SUCCESS;
 }
 
