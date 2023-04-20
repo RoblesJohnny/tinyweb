@@ -28,17 +28,17 @@
  * Types definition
 ******************************************************************************************************/
 
-//Represents a http header in a http request
+//Represents an http header in an http request
 typedef struct http_header
 {
     char name[MAX_HEADER_NAME];
     char value[MAX_HEADER_VALUE];
 } http_header;
 
-//Represents a http request
+//Represents an http request
 typedef struct http_request
 {
-    char method[MAX_METHOD_NAME_LENGTH]];               //http method (GET, HEAD, POST, etc)
+    char method[MAX_METHOD_NAME_LENGTH];                //http method (GET, HEAD, POST, etc)
     char version[MAX_VERSION_LENGTH];                   //http version (HTTP/1.1)
     char uri[MAX_URI_SIZE];                             //Resource identifier ("/index.html", "/"", "/home", etc)
     http_header header[MAX_HEADER];                     //Headers array
@@ -53,7 +53,7 @@ typedef struct http_client
     socklen_t address_size;     // Address size
 } http_client;
 
-//Represents a http server 
+//Represents an http server 
 typedef struct http_server
 {
     int socket;                                                                                           // Socket descriptor assigned
@@ -63,7 +63,7 @@ typedef struct http_server
     {
         char path[MAX_URI_SIZE];
         void *(*function)(void *args);
-    } handlers[MAX_URL_HANDLERS];                                                                        //Handler functions structure and array
+    } url_handlers[MAX_URL_HANDLERS];                                                                        //Handler functions structure and array
     
     int (*listen_and_serve)(const struct http_server *self);                                             // Pointer to the function listen_and_serve()
     void (*handle_function)(struct http_server *self, char *path, void *(*function_name)(void *args));   // Pointer to the function handle_function()
@@ -75,17 +75,31 @@ typedef struct http_server
 http_request *http_request_parse(const char *message);
 int http_listen_and_serve(const http_server *server);
 http_server http_server_create(int port, int backlog);
-void http_handle_function(http_server *server, char *path, void *(*function_name)(void *args));
+void http_handle_function_add(http_server *server, char *path, void *(*function_name)(void *args));
 
 
 /******************************************************************************************************
  * Functions implementation
  *******************************************************************************************************/
-//Registers a handle function for an specific URL in the handlers array of a server
-void http_handle_function(http_server *server, char *path, void *(*function_name)(void *args))
+
+//Registers a handle function for an specific URL in the url_handlers array of a server
+void http_handle_function_add(http_server *server, char *path, void *(*function_name)(void *args))
 {
-    strcpy(server->handlers[1].path, path);
-    server->handlers[1].function = function_name;
+    for (size_t i = 0; i < MAX_URL_HANDLERS; i++)
+    {
+        if (strcmp(server->url_handlers[i].path, "") == 0)
+        {
+            strcpy(server->url_handlers[i].path, path);
+            server->url_handlers[i].function = function_name;
+            break;        
+        }
+
+        if (i == MAX_URL_HANDLERS)
+        {
+            perror("Server URL Handlers array is full");
+            exit(EXIT_FAILURE);
+        }
+    }
 }
 
 //Listen and serve function
@@ -122,20 +136,31 @@ int http_listen_and_serve(const http_server *server)
         http_request *request = http_request_parse(buffer);
 
         //Just for testing purposes
-        // printf("%s\n%s\n%s\n", request->method, request->uri, request->version);
-        // for (size_t i = 0; i < 5; i++)
-        // {
-        //     printf("%s: %s\n", request->header[i].name, request->header[i].value);
-        // }
+        printf("%s\n%s\n%s\n", request->method, request->uri, request->version);
+        for (size_t i = 0; i < 5; i++)
+        {
+            printf("%s %s\n", request->header[i].name, request->header[i].value);
+        }
 
         // IMPORTANT>Request handling code here
-        if (strcmp(request->uri, server->handlers[1].path) == 0)
-        {   
-            void *args = NULL;
-            void *(*call_func)(void *args) = server->handlers[1].function;
-            call_func(args);
+
+        //hashing instruction
+        for (size_t i = 0; i < MAX_URL_HANDLERS; i++)
+        {
+            if (strcmp(request->uri, server->url_handlers[i].path) == 0)
+            {   
+                void *args = NULL;
+                void *(*call_func)(void *args) = server->url_handlers[i].function;
+                call_func(args);
+                break;
+            }
+
+            if (i == (MAX_URL_HANDLERS - 1))
+            {
+                perror("Handler not registered");
+            }
+            
         }
-        
 
         free(request);
         close(client.socket);
@@ -162,7 +187,7 @@ http_server http_server_create(int port, int backlog)
     server.address.sin_port = htons(port);
     server.backlog = backlog;
     server.listen_and_serve = http_listen_and_serve;
-    server.handle_function = http_handle_function;
+    server.handle_function = http_handle_function_add;
 
     // Binding
     if (bind(server.socket, (struct sockaddr *)&server.address, sizeof(server.address)) < 0)
@@ -170,6 +195,14 @@ http_server http_server_create(int port, int backlog)
         perror("http_server_create: Can not bind a socket");
         exit(EXIT_FAILURE);
     };
+
+    //Url handlers initialization
+    for (size_t i = 0; i < MAX_URL_HANDLERS; i++)
+    {
+        strcpy(server.url_handlers[i].path, "");
+        server.url_handlers[i].function = NULL;
+    }
+    
 
     return server;
 }

@@ -8,10 +8,24 @@ void *home_handler(void *args)
     return NULL;
 }
 
+void *index_handler(void *args)
+{
+    puts("index_handler hit");
+    return NULL;
+}
+
+void *student_handler(void *args)
+{
+    puts("student handler hit");
+    return NULL;
+}
+
 int main()
 {
     http_server server = http_server_create(8080, 100);
     server.handle_function(&server, "/", home_handler);
+    server.handle_function(&server, "/index", index_handler);
+    server.handle_function(&server, "/student", student_handler);
     server.listen_and_serve(&server);
 
     // char *stream = "GET /home HTTP/1.1\nhost: localhost:8080\n";
