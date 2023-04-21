@@ -28,21 +28,18 @@
  * Types definition
 ******************************************************************************************************/
 
-//Represents an http header in an http request
-typedef struct http_header
-{
-    char name[MAX_HEADER_NAME];
-    char value[MAX_HEADER_VALUE];
-} http_header;
-
-//Represents an http request
+// Represents an http request
 typedef struct http_request
 {
-    char method[MAX_METHOD_NAME_LENGTH];                //http method (GET, HEAD, POST, etc)
-    char version[MAX_VERSION_LENGTH];                   //http version (HTTP/1.1)
-    char uri[MAX_URI_SIZE];                             //Resource identifier ("/index.html", "/"", "/home", etc)
-    http_header header[MAX_HEADER];                     //Headers array
-    char body[MAX_BODY_SIZE];                           //Request body
+    char method[MAX_METHOD_NAME_LENGTH]; // http method (GET, HEAD, POST, etc)
+    char version[MAX_VERSION_LENGTH];    // http version (HTTP/1.1)
+    char uri[MAX_URI_SIZE];              // Resource identifier ("/index.html", "/"", "/home", etc)
+    struct
+    {
+        char name[MAX_HEADER_NAME];
+        char value[MAX_HEADER_VALUE];
+    } header[MAX_HEADER];     // Headers array
+    char body[MAX_BODY_SIZE]; // Request body
 } http_request;
 
 // represents a client connected to the server
@@ -53,27 +50,34 @@ typedef struct http_client
     socklen_t address_size;     // Address size
 } http_client;
 
-//Represents an http server 
+// Represents an http server
 typedef struct http_server
 {
-    int socket;                                                                                           // Socket descriptor assigned
-    int backlog;                                                                                          // Connection backlog supported by the socket
-    struct sockaddr_in address;                                                                           // Server address information
-    struct 
+    int socket;                 // Socket descriptor assigned
+    int backlog;                // Connection backlog supported by the socket
+    struct sockaddr_in address; // Server address information
+    struct
     {
         char path[MAX_URI_SIZE];
         void *(*function)(void *args);
-    } url_handlers[MAX_URL_HANDLERS];                                                                        //Handler functions structure and array
-    
-    int (*listen_and_serve)(const struct http_server *self);                                             // Pointer to the function listen_and_serve()
-    void (*handle_function)(struct http_server *self, char *path, void *(*function_name)(void *args));   // Pointer to the function handle_function()
+    } url_handlers[MAX_URL_HANDLERS]; // Handler functions structure and array
+
+    struct
+    {
+        int socket;                         // Client socket
+        struct sockaddr_in address;         // Address information
+        socklen_t address_size;             // Address size
+    } connected_client;                     //Connected client information structure
+
+    int (*listen_and_serve)(struct http_server *self);                                           // Pointer to the function listen_and_serve()
+    void (*handle_function)(struct http_server *self, char *path, void *(*function_name)(void *args)); // Pointer to the function handle_function()
 } http_server;
 
 /******************************************************************************************************
  * Functions declaration
  ******************************************************************************************************/
 http_request *http_request_parse(const char *message);
-int http_listen_and_serve(const http_server *server);
+int http_listen_and_serve(http_server *server);
 http_server http_server_create(int port, int backlog);
 void http_handle_function_add(http_server *server, char *path, void *(*function_name)(void *args));
 
@@ -103,7 +107,7 @@ void http_handle_function_add(http_server *server, char *path, void *(*function_
 }
 
 //Listen and serve function
-int http_listen_and_serve(const http_server *server)
+int http_listen_and_serve(http_server *server)
 {
 
     // Listen
@@ -113,21 +117,18 @@ int http_listen_and_serve(const http_server *server)
         exit(EXIT_FAILURE);
     };
 
-    // Creates a client
-    http_client client;
-
     // Accept connections and requests
     for (;;)
     {
-        client.socket = accept(server->socket, (struct sockaddr *)&client.address, &client.address_size);
-        if (client.socket < 0)
+        server->connected_client.socket = accept(server->socket, (struct sockaddr *)&server->connected_client.address, &server->connected_client.address_size);
+        if (server->connected_client.socket < 0)
         {
             perror("Accept failed");
         }
 
         // Read from the socket
         char buffer[BUFFER_SIZE];
-        int valread = read(client.socket, buffer, BUFFER_SIZE);
+        int valread = read(server->connected_client.socket, buffer, BUFFER_SIZE);
         if (valread < 0)
         {
             perror("webserver (read)");
@@ -135,12 +136,12 @@ int http_listen_and_serve(const http_server *server)
 
         http_request *request = http_request_parse(buffer);
 
-        //Just for testing purposes
-        printf("%s\n%s\n%s\n", request->method, request->uri, request->version);
-        for (size_t i = 0; i < 5; i++)
-        {
-            printf("%s %s\n", request->header[i].name, request->header[i].value);
-        }
+        // //Just for testing purposes
+        // printf("%s\n%s\n%s\n", request->method, request->uri, request->version);
+        // for (size_t i = 0; i < 5; i++)
+        // {
+        //     printf("%s %s\n", request->header[i].name, request->header[i].value);
+        // }
 
         // IMPORTANT>Request handling code here
 
@@ -163,7 +164,7 @@ int http_listen_and_serve(const http_server *server)
         }
 
         free(request);
-        close(client.socket);
+        close(server->connected_client.socket);
     }
     return EXIT_SUCCESS;
 }
