@@ -101,7 +101,7 @@ typedef struct http_server
 } http_server;
 
 //Type definition for a pointer to a handle function for handle requests
-typedef void (*handle_function_t)(struct http_server *self, char *path, void *(*function_name)(http_request *req), http_method method);
+typedef void *(*handle_function_t)(http_request *req);
 
 
 /******************************************************************************************************
@@ -110,38 +110,48 @@ typedef void (*handle_function_t)(struct http_server *self, char *path, void *(*
 http_request *http_request_parse(const char *message);
 int http_listen_and_serve(http_server *server);
 http_server http_server_create(int port, int backlog);
-void http_handle_function_add(http_server *server, char *path, void *(*function_name)(http_request *req), http_method method);
-int http_response_send(const int connected_client_socket, const http_response *response);
+void http_handle_function_add(http_server *server, char *path, handle_function_t function_name, http_method method);
+int http_response_send(int connected_client_socket, const http_response *response);
 
 /******************************************************************************************************
  * Functions implementation
  *******************************************************************************************************/
 
 //Sends an http_response to the client
-int http_response_send(const int connected_client_socket, const http_response *response)
+int http_response_send(int connected_client_socket, const http_response *response)
 {
     //Creates the buffer to store the serialized response
-    char *buffer = malloc(sizeof(char) * BUFFER_SIZE);
+    char buffer[BUFFER_SIZE] = "";
+    char headers[100] = ""; //TODO: Create a MAX headers lenght in a response
+
+    int i = 0;
+    while (strcmp(response->header[i].name, "") != 0)
+    {
+        strcat(headers, response->header[i].name);
+        strcat(headers, " ");
+        strcat(headers, response->header[i].value);    
+        strcat(headers, "\r\n");
+        i++;
+    }
 
     //Serializes the response
-    if (sprintf(buffer, "%s %d\r\nServer: webserver-c\r\nContent-type: text/html\r\n\r\n%s", response->version, response->code, response->body) < 0)
+    if (sprintf(buffer, "%s %d\r\n%s\r\n%s", response->version, response->code, headers, response->body) < 0)
     {
         perror("Error serializing response");
     }
 
     //Writes to the client
-    int valwrite = write(connected_client_socket, buffer, sizeof(buffer));
+    int valwrite = write(connected_client_socket, buffer, strlen(buffer));
     if (valwrite < 0)
     {
         perror("http_response_send");
     }
-    
-    free(buffer);
-    return valwrite; 
+
+    return 0; 
 }
 
 // Registers a handle function for an specific URL in the url_handlers array of a server
-void http_handle_function_add(http_server *server, char *path, void *(*function_name)(http_request *req), http_method method)
+void http_handle_function_add(http_server *server, char *path, handle_function_t function_name, http_method method)
 {
     for (size_t i = 0; i < MAX_URL_HANDLERS; i++)
     {
@@ -205,7 +215,7 @@ int http_listen_and_serve(http_server *server)
         {
             if ((strcmp(request->uri, server->url_handlers[i].path) == 0) && (request->method == server->url_handlers[i].method))
             {
-                void *(*call_func)(http_request *req) = server->url_handlers[i].function;
+                handle_function_t call_func = server->url_handlers[i].function;
                 call_func(request);
                 break;
             }
