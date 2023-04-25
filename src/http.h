@@ -24,6 +24,8 @@
 /******************************************************************************************************
  * Types definition
  ******************************************************************************************************/
+
+//Enumeration for the http methods
 typedef enum http_method
 {
     HTTP_METHOD_GET,
@@ -33,6 +35,28 @@ typedef enum http_method
     HTTP_METHOD_DELETE, 
     HTTP_METHOD_UNDEFINED
 } http_method;
+
+//Response codes supported
+typedef enum http_response_code
+{
+    HTTP_200_OK=200,
+    HTTP_404_NOT_FOUND=404,
+    HTTP_501_NOT_IMPLEMENTED=501,
+    HTTP_505_VERSION_NOT_SUPPORTED=505
+} http_response_code;
+
+// Represents an http response
+typedef struct http_response
+{
+    char version[MAX_VERSION_LENGTH];
+    http_response_code code;
+    struct
+    {
+        char name[MAX_HEADER_NAME];
+        char value[MAX_HEADER_VALUE];
+    } header[MAX_HEADER];     // Headers array
+    char body[MAX_BODY_SIZE];
+} http_response;
 
 // Represents an http request
 typedef struct http_request
@@ -44,8 +68,13 @@ typedef struct http_request
     {
         char name[MAX_HEADER_NAME];
         char value[MAX_HEADER_VALUE];
-    } header[MAX_HEADER];     // Headers array
-    char body[MAX_BODY_SIZE]; // Request body
+    } header[MAX_HEADER];               // Headers array
+    char body[MAX_BODY_SIZE];           // Request body
+    struct                              // Request additional information 
+    {
+        int client_socket;              // Connected client socket descriptor
+    } additional_info;
+    
 } http_request;
 
 // Represents an http server
@@ -69,8 +98,11 @@ typedef struct http_server
     } connected_client;             // Connected client information structure
 
     int (*listen_and_serve)(struct http_server *self);                                                                     // Pointer to the function listen_and_serve()
-    void (*handle_function)(struct http_server *self, char *path, void *(*function_name)(http_request *req), http_method method); // Pointer to the function handle_function()
 } http_server;
+
+//Type definition for a pointer to a handle function for handle requests
+typedef void (*handle_function_t)(struct http_server *self, char *path, void *(*function_name)(http_request *req), http_method method);
+
 
 /******************************************************************************************************
  * Functions declaration
@@ -79,10 +111,34 @@ http_request *http_request_parse(const char *message);
 int http_listen_and_serve(http_server *server);
 http_server http_server_create(int port, int backlog);
 void http_handle_function_add(http_server *server, char *path, void *(*function_name)(http_request *req), http_method method);
+int http_response_send(const int connected_client_socket, const http_response *response);
 
 /******************************************************************************************************
  * Functions implementation
  *******************************************************************************************************/
+
+//Sends an http_response to the client
+int http_response_send(const int connected_client_socket, const http_response *response)
+{
+    //Creates the buffer to store the serialized response
+    char *buffer = malloc(sizeof(char) * BUFFER_SIZE);
+
+    //Serializes the response
+    if (sprintf(buffer, "%s %d\r\nServer: webserver-c\r\nContent-type: text/html\r\n\r\n%s", response->version, response->code, response->body) < 0)
+    {
+        perror("Error serializing response");
+    }
+
+    //Writes to the client
+    int valwrite = write(connected_client_socket, buffer, sizeof(buffer));
+    if (valwrite < 0)
+    {
+        perror("http_response_send");
+    }
+    
+    free(buffer);
+    return valwrite; 
+}
 
 // Registers a handle function for an specific URL in the url_handlers array of a server
 void http_handle_function_add(http_server *server, char *path, void *(*function_name)(http_request *req), http_method method)
@@ -134,6 +190,7 @@ int http_listen_and_serve(http_server *server)
         }
 
         http_request *request = http_request_parse(buffer);
+        request->additional_info.client_socket = server->connected_client.socket;
 
         // //Just for testing purposes
         // printf("%s\n%s\n%s\n", request->method, request->uri, request->version);
@@ -184,7 +241,6 @@ http_server http_server_create(int port, int backlog)
     server.address.sin_port = htons(port);
     server.backlog = backlog;
     server.listen_and_serve = http_listen_and_serve;
-    server.handle_function = http_handle_function_add;
 
     // Binding
     if (bind(server.socket, (struct sockaddr *)&server.address, sizeof(server.address)) < 0)

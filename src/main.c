@@ -5,6 +5,14 @@
 void *home_handler(http_request *req)
 {
     printf("%d %s %s\n", req->method, req->uri, req->version);
+    http_response response;
+
+    response.code = HTTP_200_OK;
+    strcpy(response.header[0].name, "Content-type:");
+    strcpy(response.header[0].value, "text/html");
+    strcpy(response.version, HTTP_SUPPORTED_VERSION);
+    strcpy(response.body, "<html>hello, world</html>\r\n");
+    http_response_send(req->additional_info.client_socket, &response);
     return NULL;
 }
 
@@ -23,9 +31,9 @@ void *student_handler(http_request *req)
 int main()
 {
     http_server server = http_server_create(8080, 100);
-    server.handle_function(&server, "/", home_handler, HTTP_METHOD_GET);
-    server.handle_function(&server, "/index", index_handler, HTTP_METHOD_GET);
-    server.handle_function(&server, "/student", student_handler, HTTP_METHOD_POST);
+    http_handle_function_add(&server, "/", home_handler, HTTP_METHOD_GET);
+    http_handle_function_add(&server, "/index", index_handler, HTTP_METHOD_GET);
+    http_handle_function_add(&server, "/student", student_handler, HTTP_METHOD_POST);
     server.listen_and_serve(&server);
 
     // char *stream = "GET /home HTTP/1.1\nhost: localhost:8080\n";
