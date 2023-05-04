@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdbool.h>
 
 // Constants
 #define MAX_HEADER 100
@@ -41,6 +42,7 @@ typedef enum http_response_code
 {
     HTTP_200_OK=200,
     HTTP_404_NOT_FOUND=404,
+    HTTP_500_INTERNAL_SERVER_ERROR=500,
     HTTP_501_NOT_IMPLEMENTED=501,
     HTTP_505_VERSION_NOT_SUPPORTED=505
 } http_response_code;
@@ -77,6 +79,9 @@ typedef struct http_request
     
 } http_request;
 
+//Type definition for a pointer to a handle function for handle requests
+typedef void (*handle_function_t)(http_request *req, http_response *res);
+
 // Represents an http server
 typedef struct http_server
 {
@@ -86,7 +91,7 @@ typedef struct http_server
     struct
     {
         char path[MAX_URI_SIZE];
-        void *(*function)(http_request *req);
+        handle_function_t function;
         http_method method;
     } url_handlers[MAX_URL_HANDLERS]; // Handler functions structure and array
 
@@ -100,8 +105,7 @@ typedef struct http_server
     int (*listen_and_serve)(struct http_server *self);                                                                     // Pointer to the function listen_and_serve()
 } http_server;
 
-//Type definition for a pointer to a handle function for handle requests
-typedef void *(*handle_function_t)(http_request *req);
+
 
 
 /******************************************************************************************************
@@ -112,6 +116,7 @@ int http_listen_and_serve(http_server *server);
 http_server http_server_create(int port, int backlog);
 void http_handle_function_add(http_server *server, char *path, handle_function_t function_name, http_method method);
 int http_response_send(int connected_client_socket, const http_response *response);
+http_response *http_response_create();
 
 /******************************************************************************************************
  * Functions implementation
@@ -202,31 +207,28 @@ int http_listen_and_serve(http_server *server)
         http_request *request = http_request_parse(buffer);
         request->additional_info.client_socket = server->connected_client.socket;
 
-        // //Just for testing purposes
-        // printf("%s\n%s\n%s\n", request->method, request->uri, request->version);
-        // for (size_t i = 0; i < 5; i++)
-        // {
-        //     printf("%s %s\n", request->header[i].name, request->header[i].value);
-        // }
-
-        // IMPORTANT>Request handling code here
+        http_response *response = http_response_create();
 
         for (size_t i = 0; i < MAX_URL_HANDLERS; i++)
         {
             if ((strcmp(request->uri, server->url_handlers[i].path) == 0) && (request->method == server->url_handlers[i].method))
             {
                 handle_function_t call_func = server->url_handlers[i].function;
-                call_func(request);
+                call_func(request, response);
+                http_response_send(request->additional_info.client_socket, response);
                 break;
             }
 
             if (i == (MAX_URL_HANDLERS - 1))
             {
-                perror("Handler not registered");
+                perror("404 NOT FOUND");
+                response->code = HTTP_404_NOT_FOUND;
+                http_response_send(request->additional_info.client_socket, response);
             }
         }
 
         free(request);
+        free(response);
         close(server->connected_client.socket);
     }
     return EXIT_SUCCESS;
@@ -332,4 +334,38 @@ http_request *http_request_parse(const char *message)
     return request;
 }
 
+
+// //Adds a header to a response
+// bool http_response_header_add(http_response *response, char *header_name, char *header_value)
+// {   
+//     for (size_t i = 0; i < MAX_HEADER; i++)
+//     {
+//         if (strcmp(response->header[i].name, "") == 0)
+//         {
+//             strcpy(response->header[i].name,header_name);
+//             strcpy(response->header[i].value, header_value);
+//             break;
+//         }
+
+//         if (i == MAX_HEADER)
+//         {
+//             perror("Response header array is full");
+//             return false;
+//         }
+//     }
+//     return true;
+// }
+
+//Creates a default response 
+//Warning: Caller must free the response pointer returned by this function
+http_response *http_response_create()
+{
+    http_response *response = malloc(sizeof(http_response));
+    response->code = HTTP_200_OK;
+    strcpy(response->version, HTTP_SUPPORTED_VERSION);
+    // strcpy(response->header[0].name, "Content-type:");
+    // strcpy(response->header[0].value, "text/html");
+
+    return response;
+}
 #endif
