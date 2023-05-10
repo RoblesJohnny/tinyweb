@@ -1,10 +1,11 @@
-# tinyweb
-A simple HTTP library for educational purposes
+# Tinyweb
+A simple HTTP/1.1 C library
 
 ## Description 
 Have you ever wonder how the HTTP protocol works? 
 When someone ask you to develop an HTTP Server/API or something similar your code look like this?
-```
+
+```javascript
   var http = require('http');
 
   http.createServer(function (req, res) {
@@ -14,9 +15,7 @@ When someone ask you to develop an HTTP Server/API or something similar your cod
 ```
 Well if this is your case, this repo could help you. 
 
-Tinyweb is an implementation of the HTTP/1.1 protocol that I'm doing in C. Why C? because if you **really** want to understand how something works. Yo should do it in C. 
-
-Don't get me wrong, Thank God, the cool libraries, languages and frameworks that we have today exist. Otherwise our work would have been a lot harder. But once in a time it is good to do something for the sake of understanding.
+Tinyweb is an implementation of the HTTP/1.1 protocol written in C. Why C? Because if you **really** want to understand how something works, you should do it in C. 
 
 ## Pre requisites
 1. clang or gcc installed
@@ -62,5 +61,16 @@ Finally, server.listen_and_serve starts the server and listening in the 8080 por
 ## Main types
 
 ### The http_server type
+1. Structure
+2. Fields
+3. Function pointers
+
 ### The http_request type
+1. Structure
+2. Fields
+3. Function pointers
+
 ### The http_response type
+1. Structure
+2. Fields
+3. Function pointers
