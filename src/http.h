@@ -72,11 +72,6 @@ typedef struct http_request
         char value[MAX_HEADER_VALUE];
     } header[MAX_HEADER];               // Headers array
     char body[MAX_BODY_SIZE];           // Request body
-    struct                              // Request additional information 
-    {
-        int client_socket;              // Connected client socket descriptor
-    } additional_info;
-    
 } http_request;
 
 //Type definition for a pointer to a handle function for handle requests
@@ -102,7 +97,8 @@ typedef struct http_server
         socklen_t address_size;     // Address size
     } connected_client;             // Connected client information structure
 
-    int (*listen_and_serve)(struct http_server *self);                                                                     // Pointer to the function listen_and_serve()
+    int (*listen_and_serve)(struct http_server *self);                                                                                    // Pointer to the function listen_and_serve()
+    void (*add_url_handler)(struct http_server *server, char *path, handle_function_t function_name, http_method method);          // Pointer to the function http_handler_function_add()
 } http_server;
 
 
@@ -114,7 +110,7 @@ typedef struct http_server
 http_request *http_request_parse(const char *message);
 int http_listen_and_serve(http_server *server);
 http_server http_server_create(int port, int backlog);
-void http_handle_function_add(http_server *server, char *path, handle_function_t function_name, http_method method);
+void http_handler_function_add(http_server *server, char *path, handle_function_t function_name, http_method method);
 int http_response_send(int connected_client_socket, const http_response *response);
 http_response *http_response_create();
 
@@ -156,7 +152,7 @@ int http_response_send(int connected_client_socket, const http_response *respons
 }
 
 // Registers a handle function for an specific URL in the url_handlers array of a server
-void http_handle_function_add(http_server *server, char *path, handle_function_t function_name, http_method method)
+void http_handler_function_add(http_server *server, char *path, handle_function_t function_name, http_method method)
 {
     for (size_t i = 0; i < MAX_URL_HANDLERS; i++)
     {
@@ -255,6 +251,7 @@ http_server http_server_create(int port, int backlog)
     server.address.sin_port = htons(port);
     server.backlog = backlog;
     server.listen_and_serve = http_listen_and_serve;
+    server.add_url_handler = http_handler_function_add;
 
     // Binding
     if (bind(server.socket, (struct sockaddr *)&server.address, sizeof(server.address)) < 0)
