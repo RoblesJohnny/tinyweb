@@ -4,10 +4,7 @@
 
 void home_handler(http_request *request, http_response *response)
 {
-    strcpy(response->header[0].name, "Content-type:");
-    strcpy(response->header[0].value, "text/html");
-    strcpy(response->header[1].name, "Content-Length:");
-    strcpy(response->header[1].value, "30");
+    //http_response_header_add(response, "Content-lenght:", "30");
     strcpy(response->body, "<html>hello, world</html>\r\n");
     //http_response_send(request->additional_info.client_socket, response);
 }

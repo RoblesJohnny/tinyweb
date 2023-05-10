@@ -126,8 +126,8 @@ http_response *http_response_create();
 int http_response_send(int connected_client_socket, const http_response *response)
 {
     //Creates the buffer to store the serialized response
-    char buffer[BUFFER_SIZE] = "";
-    char headers[100] = ""; //TODO: Create a MAX headers lenght in a response
+    char buffer[BUFFER_SIZE];
+    char headers[1000]; //TODO: Create a MAX headers lenght in a response
 
     int i = 0;
     while (strcmp(response->header[i].name, "") != 0)
@@ -168,7 +168,7 @@ void http_handle_function_add(http_server *server, char *path, handle_function_t
             break;
         }
 
-        if (i == MAX_URL_HANDLERS)
+        if (i == (MAX_URL_HANDLERS - 1))
         {
             perror("Server URL Handlers array is full");
             exit(EXIT_FAILURE);
@@ -201,12 +201,11 @@ int http_listen_and_serve(http_server *server)
         int valread = read(server->connected_client.socket, buffer, BUFFER_SIZE);
         if (valread < 0)
         {
-            perror("webserver (read)");
+            perror("Read failed");
         }
 
+        //Parse request and create standard response 
         http_request *request = http_request_parse(buffer);
-        request->additional_info.client_socket = server->connected_client.socket;
-
         http_response *response = http_response_create();
 
         for (size_t i = 0; i < MAX_URL_HANDLERS; i++)
@@ -215,15 +214,18 @@ int http_listen_and_serve(http_server *server)
             {
                 handle_function_t call_func = server->url_handlers[i].function;
                 call_func(request, response);
-                http_response_send(request->additional_info.client_socket, response);
+                //TODO Uncomment the response send
+                printf("%d\n%s\n%s\n", response->code, response->version, response->body);
+                http_response_send(server->connected_client.socket, response);
                 break;
             }
 
             if (i == (MAX_URL_HANDLERS - 1))
             {
-                perror("404 NOT FOUND");
+                //404 NOT FOUND
                 response->code = HTTP_404_NOT_FOUND;
-                http_response_send(request->additional_info.client_socket, response);
+                printf("%d\n%s\n%s\n", response->code, response->version, response->body);
+                http_response_send(server->connected_client.socket, response);
             }
         }
 
@@ -334,27 +336,26 @@ http_request *http_request_parse(const char *message)
     return request;
 }
 
+//Adds a header to a response
+bool http_response_header_add(http_response *response, char *header_name, char *header_value)
+{   
+    for (size_t i = 0; i < MAX_HEADER; i++)
+    {
+        if (strcmp(response->header[i].name, "") == 0)
+        {
+            strcpy(response->header[i].name,header_name);
+            strcpy(response->header[i].value, header_value);
+            break;
+        }
 
-// //Adds a header to a response
-// bool http_response_header_add(http_response *response, char *header_name, char *header_value)
-// {   
-//     for (size_t i = 0; i < MAX_HEADER; i++)
-//     {
-//         if (strcmp(response->header[i].name, "") == 0)
-//         {
-//             strcpy(response->header[i].name,header_name);
-//             strcpy(response->header[i].value, header_value);
-//             break;
-//         }
-
-//         if (i == MAX_HEADER)
-//         {
-//             perror("Response header array is full");
-//             return false;
-//         }
-//     }
-//     return true;
-// }
+        if (i == (MAX_HEADER - 1))
+        {
+            perror("Response header array is full");
+            return false;
+        }
+    }
+    return true;
+}
 
 //Creates a default response 
 //Warning: Caller must free the response pointer returned by this function
@@ -363,8 +364,16 @@ http_response *http_response_create()
     http_response *response = malloc(sizeof(http_response));
     response->code = HTTP_200_OK;
     strcpy(response->version, HTTP_SUPPORTED_VERSION);
-    // strcpy(response->header[0].name, "Content-type:");
-    // strcpy(response->header[0].value, "text/html");
+    strcpy(response->body, "\0");
+    
+    //Clean the headers
+    for (size_t i = 0; i < MAX_HEADER; i++)
+    {
+        strcpy(response->header[i].name, "\0");
+        strcpy(response->header[i].value, "\0");
+    }
+    
+    http_response_header_add(response, "Content-type:", "text/html");
 
     return response;
 }
