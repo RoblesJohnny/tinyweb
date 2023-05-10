@@ -4,9 +4,8 @@
 
 void home_handler(http_request *request, http_response *response)
 {
-    //http_response_header_add(response, "Content-lenght:", "30");
-    strcpy(response->body, "<html>hello, world</html>\r\n");
-    //http_response_send(request->additional_info.client_socket, response);
+    response->add_header(response, "Content-type:", "text/html");
+    response->add_body(response,  "<html>hello, world Johnny</html>\r\n");
 }
 
 void index_handler(http_request *request, http_response *response)

@@ -10,7 +10,10 @@
 #include <string.h>
 #include <stdbool.h>
 
-// Constants
+/******************************************************************************************************
+* Constants
+******************************************************************************************************/
+
 #define MAX_HEADER 100
 #define HTTP_SUPPORTED_VERSION "HTTP/1.1"
 #define MAX_URI_SIZE 8000
@@ -58,6 +61,8 @@ typedef struct http_response
         char value[MAX_HEADER_VALUE];
     } header[MAX_HEADER];     // Headers array
     char body[MAX_BODY_SIZE];
+    void (*add_header)(struct http_response *self, char *header_name, char *header_value);
+    void (*add_body)(struct http_response *self, char *body);
 } http_response;
 
 // Represents an http request
@@ -113,8 +118,10 @@ http_server http_server_create(int port, int backlog);
 void http_handler_function_add(http_server *server, char *path, handle_function_t function_name, http_method method);
 int http_response_send(int connected_client_socket, const http_response *response);
 http_response *http_response_create();
+void http_response_header_add(http_response *response, char *header_name, char *header_value);
+void http_response_body_add(http_response *self, char *body);
 
-/******************************************************************************************************
+/*******************************************************************************************************
  * Functions implementation
  *******************************************************************************************************/
 
@@ -122,11 +129,11 @@ http_response *http_response_create();
 int http_response_send(int connected_client_socket, const http_response *response)
 {
     //Creates the buffer to store the serialized response
-    char buffer[BUFFER_SIZE];
-    char headers[1000]; //TODO: Create a MAX headers lenght in a response
+    char buffer[BUFFER_SIZE] = "\0";
+    char headers[1000] = "\0"; //TODO: Create a MAX headers lenght in a response
 
     int i = 0;
-    while (strcmp(response->header[i].name, "") != 0)
+    while (strcmp(response->header[i].name, "\0") != 0)
     {
         strcat(headers, response->header[i].name);
         strcat(headers, " ");
@@ -156,7 +163,7 @@ void http_handler_function_add(http_server *server, char *path, handle_function_
 {
     for (size_t i = 0; i < MAX_URL_HANDLERS; i++)
     {
-        if (strcmp(server->url_handlers[i].path, "") == 0)
+        if (strcmp(server->url_handlers[i].path, "\0") == 0)
         {
             strcpy(server->url_handlers[i].path, path);
             server->url_handlers[i].function = function_name;
@@ -211,7 +218,7 @@ int http_listen_and_serve(http_server *server)
                 handle_function_t call_func = server->url_handlers[i].function;
                 call_func(request, response);
                 //TODO Uncomment the response send
-                printf("%d\n%s\n%s\n", response->code, response->version, response->body);
+                //printf("%d\n%s\n%s\n", response->code, response->version, response->body);
                 http_response_send(server->connected_client.socket, response);
                 break;
             }
@@ -220,7 +227,7 @@ int http_listen_and_serve(http_server *server)
             {
                 //404 NOT FOUND
                 response->code = HTTP_404_NOT_FOUND;
-                printf("%d\n%s\n%s\n", response->code, response->version, response->body);
+                //printf("%d\n%s\n%s\n", response->code, response->version, response->body);
                 http_response_send(server->connected_client.socket, response);
             }
         }
@@ -263,7 +270,7 @@ http_server http_server_create(int port, int backlog)
     // Url handlers initialization
     for (size_t i = 0; i < MAX_URL_HANDLERS; i++)
     {
-        strcpy(server.url_handlers[i].path, "");
+        strcpy(server.url_handlers[i].path, "\0");
         server.url_handlers[i].function = NULL;
         server.url_handlers[i].method = HTTP_METHOD_UNDEFINED;
     }
@@ -334,13 +341,13 @@ http_request *http_request_parse(const char *message)
 }
 
 //Adds a header to a response
-bool http_response_header_add(http_response *response, char *header_name, char *header_value)
+void http_response_header_add(http_response *response, char *header_name, char *header_value)
 {   
     for (size_t i = 0; i < MAX_HEADER; i++)
     {
-        if (strcmp(response->header[i].name, "") == 0)
+        if (strcmp(response->header[i].name, "\0") == 0)
         {
-            strcpy(response->header[i].name,header_name);
+            strcpy(response->header[i].name, header_name);
             strcpy(response->header[i].value, header_value);
             break;
         }
@@ -348,10 +355,9 @@ bool http_response_header_add(http_response *response, char *header_name, char *
         if (i == (MAX_HEADER - 1))
         {
             perror("Response header array is full");
-            return false;
+            exit(EXIT_FAILURE);
         }
     }
-    return true;
 }
 
 //Creates a default response 
@@ -360,6 +366,8 @@ http_response *http_response_create()
 {
     http_response *response = malloc(sizeof(http_response));
     response->code = HTTP_200_OK;
+    response->add_header = http_response_header_add;
+    response->add_body = http_response_body_add;
     strcpy(response->version, HTTP_SUPPORTED_VERSION);
     strcpy(response->body, "\0");
     
@@ -369,9 +377,14 @@ http_response *http_response_create()
         strcpy(response->header[i].name, "\0");
         strcpy(response->header[i].value, "\0");
     }
-    
-    http_response_header_add(response, "Content-type:", "text/html");
 
     return response;
 }
+
+// Adds a body to a response
+void http_response_body_add(http_response *self, char *body)
+{
+    strcpy(self->body, body);
+}
+
 #endif
