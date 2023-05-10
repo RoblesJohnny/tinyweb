@@ -106,9 +106,6 @@ typedef struct http_server
     void (*add_url_handler)(struct http_server *server, char *path, handle_function_t function_name, http_method method);          // Pointer to the function http_handler_function_add()
 } http_server;
 
-
-
-
 /******************************************************************************************************
  * Functions declaration
  ******************************************************************************************************/
@@ -377,6 +374,8 @@ http_response *http_response_create()
         strcpy(response->header[i].name, "\0");
         strcpy(response->header[i].value, "\0");
     }
+
+    response->add_header(response, "Content-type:", "text/html");
 
     return response;
 }

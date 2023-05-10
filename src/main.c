@@ -5,12 +5,12 @@
 void home_handler(http_request *request, http_response *response)
 {
     response->add_header(response, "Content-type:", "text/html");
-    response->add_body(response,  "<html>hello, world Johnny</html>\r\n");
+    response->add_body(response,  "<html><h1>Home</1></html>\r\n");
 }
 
 void index_handler(http_request *request, http_response *response)
 {
-    
+    response->add_body(response, "<html><h1>Index</h1></html>");
 }
 
 int main()
