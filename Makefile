@@ -1,9 +1,9 @@
-CC		= gcc
+CC		= clang
 CFLAGS	= -g -Wall
 BINDIR	= bin
 OBJDIR	= obj
 SRCDIR	= src
-BIN  	= $(BINDIR)/tinyweb
+BIN  	= $(BINDIR)/api
 SRCS 	= $(wildcard $(SRCDIR)/*.c)
 OBJS	= $(patsubst $(SRCDIR)/%.c, $(OBJDIR)/%.o, $(SRCS))
 
