@@ -17,7 +17,7 @@ int main()
 {
     http_server server = http_server_create(8080, 100);
     server.add_url_handler(&server, "/", home_handler, HTTP_METHOD_GET);
-    server.add_url_handler(&server, "/index", index_handler, HTTP_METHOD_GET );
+    server.add_url_handler(&server, "/index", index_handler, HTTP_METHOD_GET);
     server.listen_and_serve(&server);
     return 0;
 }
