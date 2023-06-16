@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdbool.h>
+#include <time.h>
 
 /******************************************************************************************************
 * Constants
@@ -117,10 +118,21 @@ int http_response_send(int connected_client_socket, const http_response *respons
 http_response *http_response_create();
 void http_response_header_add(http_response *response, char *header_name, char *header_value);
 void http_response_body_add(http_response *self, char *body);
+char *http_get_date();
 
 /*******************************************************************************************************
  * Functions implementation
  *******************************************************************************************************/
+
+//Returns a date string in the format "Sun Sep 16 01:03:52 2018" for the current date returned value must be freed
+char *http_get_date()
+{
+    time_t t = time(NULL);
+    char *date = malloc(100 * sizeof(char));
+    
+    sprintf(date, "%s", ctime(&t));
+    return date;
+}
 
 //Sends an http_response to the client
 int http_response_send(int connected_client_socket, const http_response *response)
@@ -224,6 +236,7 @@ int http_listen_and_serve(http_server *server)
             {
                 //404 NOT FOUND
                 response->code = HTTP_404_NOT_FOUND;
+                response->add_body(response, "<h1>404 Not Found</h1>");
                 //printf("%d\n%s\n%s\n", response->code, response->version, response->body);
                 http_response_send(server->connected_client.socket, response);
             }
@@ -342,6 +355,12 @@ void http_response_header_add(http_response *response, char *header_name, char *
 {   
     for (size_t i = 0; i < MAX_HEADER; i++)
     {
+        if (strcmp(response->header[i].name, header_name) == 0)
+        {
+            strcpy(response->header[i].value, header_value);
+            break;
+        }
+
         if (strcmp(response->header[i].name, "\0") == 0)
         {
             strcpy(response->header[i].name, header_name);
@@ -376,6 +395,10 @@ http_response *http_response_create()
     }
 
     response->add_header(response, "Content-type:", "text/html");
+    response->add_header(response, "Server:", "tinyweb");
+    char *date = http_get_date();
+    response->add_header(response, "Date:", date );
+    free(date);
 
     return response;
 }
@@ -385,5 +408,15 @@ void http_response_body_add(http_response *self, char *body)
 {
     strcpy(self->body, body);
 }
+
+//create a function to do logging to the console
+void http_server_log(http_server *self, char *message)
+{
+    printf("%s\n", message);
+}
+
+
+
+
 
 #endif
